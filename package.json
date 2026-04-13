@@ -1,0 +1,17 @@
+{
+  "name": "@sami/sdk",
+  "version": "0.1.0",
+  "description": "SDK oficial para integrar Sami ID en tus aplicaciones",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  },
+  "keywords": ["sami-id", "auth", "oauth"],
+  "author": "samilososami",
+  "license": "MIT"
+}
