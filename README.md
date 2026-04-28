@@ -1,6 +1,6 @@
 # @sami/sdk
 
-SDK oficial para integrar **Sami ID** en tus aplicaciones.
+SDK oficial para integrar **Iniciar sesión con Sami ID**.
 
 ## Instalación
 
@@ -8,68 +8,71 @@ SDK oficial para integrar **Sami ID** en tus aplicaciones.
 npm install @sami/sdk
 ```
 
-## Uso en servidor (Node.js / Next.js)
+## Flujo recomendado en servidor
 
 ```ts
-import SamiAuth from '@sami/sdk'
+import SamiAuth, { generateSamiState } from '@sami/sdk'
 
-const samiAuth = new SamiAuth({
-  clientId: 'tu-client-id',
-  clientSecret: 'tu-client-secret',
-  redirectUri: 'https://tu-app.com/callback',
+const sami = new SamiAuth({
+  clientId: process.env.SAMI_CLIENT_ID!,
+  clientSecret: process.env.SAMI_CLIENT_SECRET!,
+  redirectUri: 'https://tu-app.com/auth/sami/callback',
 })
 
-// 1. Generar URL de autorización
-const url = samiAuth.getAuthUrl({ state: 'csrf-token' })
-// Redirige al usuario a esta URL
+export function login(req, res) {
+  const state = generateSamiState()
+  req.session.samiState = state
+  res.redirect(sami.getAuthUrl({ state }))
+}
 
-// 2. En tu endpoint /callback — intercambiar code por token
-const { access_token } = await samiAuth.exchangeCode(req.query.code)
+export async function callback(req, res) {
+  if (req.query.state !== req.session.samiState) {
+    return res.status(400).send('Invalid state')
+  }
 
-// 3. Obtener datos del usuario
-const user = await samiAuth.getUser(access_token)
-console.log(user.email, user.name)
+  const token = await sami.exchangeCode(String(req.query.code))
+  const user = await sami.getUser(token.access_token)
+
+  req.session.user = user
+  res.redirect('/dashboard')
+}
 ```
 
-## Uso en cliente (React / Vanilla JS)
+## Botón en frontend
 
 ```ts
-import { samiIdLogin } from '@sami/sdk'
+import { buildSamiAuthUrl, generateSamiState, SAMI_ID_ASSETS } from '@sami/sdk'
 
-// Botón de login
-<button onClick={() => samiIdLogin({
+const state = generateSamiState()
+sessionStorage.setItem('sami_oauth_state', state)
+
+const url = buildSamiAuthUrl({
   clientId: 'tu-client-id',
-  redirectUri: 'https://tu-app.com/callback',
-})}>
-  Iniciar sesión con Sami ID
-</button>
+  redirectUri: 'https://tu-app.com/auth/sami/callback',
+  state,
+})
+
+document.querySelector('#login')!.innerHTML = `
+  <a class="sami-login" href="${url}">
+    <img src="${SAMI_ID_ASSETS.full}" alt="Iniciar sesión con Sami ID" />
+  </a>
+`
 ```
+
+Assets oficiales:
+
+- `SAMI_ID_ASSETS.full`
+- `SAMI_ID_ASSETS.icon`
 
 ## API
 
-### `new SamiAuth(config)`
-| Parámetro | Tipo | Descripción |
-|---|---|---|
-| `clientId` | `string` | Tu client ID |
-| `clientSecret` | `string` | Tu client secret (solo servidor) |
-| `redirectUri` | `string` | URL de callback registrada |
+- `new SamiAuth(config)`
+- `sami.getAuthUrl({ state, scope })`
+- `sami.exchangeCode(code)`
+- `sami.getUser(accessToken)`
+- `buildSamiAuthUrl(config)`
+- `samiIdLogin(config)`
+- `generateSamiState()`
+- `getSamiLoginButtonHtml(authUrl, options)`
 
-### `.getAuthUrl(options?)` → `string`
-Devuelve la URL a la que redirigir al usuario para autenticarse.
-
-### `.exchangeCode(code)` → `Promise<TokenResponse>`
-Intercambia el authorization code por un access token.
-
-### `.getUser(accessToken)` → `Promise<UserInfo>`
-Devuelve el perfil del usuario autenticado.
-
-### `samiIdLogin(config)` (browser)
-Redirige el navegador directamente al flujo de login.
-
-## Registro de apps
-
-Para obtener un `client_id` y `client_secret`, contacta con el administrador de Sami ID.
-
----
-
-auth.samilososami.com
+Las apps se registran desde el panel admin de `id.samilososami.com`.
